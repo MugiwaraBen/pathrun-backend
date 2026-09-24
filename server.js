@@ -15,6 +15,7 @@ const ROOT = __dirname;
 const MAX_CLIENTS = 100;
 const MAX_MSG_BYTES = 4096;
 const MAX_STATES_PER_SEC = 40;
+const SKIN_COUNT = 2; // 0 = perso 1 (idle.png...), 1 = perso 2 (idle2.png...) : garder identique au client
 
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -56,7 +57,7 @@ server.on('upgrade', (req, socket) => {
 });
 
 function addClient(socket) {
-  const c = { id: nextId++, socket, buf: Buffer.alloc(0), nick: null, state: null, alive: true, dead: false, t0: Date.now(), win: 0, n: 0 };
+  const c = { id: nextId++, socket, buf: Buffer.alloc(0), nick: null, skin: 0, state: null, alive: true, dead: false, t0: Date.now(), win: 0, n: 0 };
   clients.set(c.id, c);
   socket.on('data', chunk => {
     c.alive = true;
@@ -123,6 +124,10 @@ function cleanNick(v) {
   const s = Array.from(String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim()).slice(0, 16).join('').trim();
   return s || 'Joueur';
 }
+function cleanSkin(v) {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n < SKIN_COUNT ? n : 0;
+}
 function uniqueNick(base, self) {
   const taken = new Set();
   for (const o of clients.values()) if (o !== self && o.nick) taken.add(o.nick.toLowerCase());
@@ -143,10 +148,11 @@ function onMessage(c, text) {
   if (m.t === 'join') {
     if (c.nick) return;
     c.nick = uniqueNick(cleanNick(m.nick), c);
+    c.skin = cleanSkin(m.skin);
     const peers = [];
-    for (const o of clients.values()) if (o !== c && o.nick) peers.push(Object.assign({ id: o.id, nick: o.nick }, o.state || {}));
+    for (const o of clients.values()) if (o !== c && o.nick) peers.push(Object.assign({ id: o.id, nick: o.nick, skin: o.skin }, o.state || {}));
     send(c, { t: 'welcome', id: c.id, peers });
-    broadcast(c, { t: 'join', id: c.id, nick: c.nick });
+    broadcast(c, { t: 'join', id: c.id, nick: c.nick, skin: c.skin });
     console.log('+ ' + c.nick + ' (' + countJoined() + ' en ligne)');
   } else if (m.t === 's' && c.nick) {
     const now = Date.now();
@@ -154,8 +160,9 @@ function onMessage(c, text) {
     if (++c.n > MAX_STATES_PER_SEC) return;
     const st = cleanState(m);
     if (!st) return;
+    if (m.skin !== undefined) c.skin = cleanSkin(m.skin); // le perso peut aussi etre mis a jour en cours de partie
     c.state = st;
-    broadcast(c, Object.assign({ t: 's', id: c.id }, st));
+    broadcast(c, Object.assign({ t: 's', id: c.id, skin: c.skin }, st));
   }
 }
 
