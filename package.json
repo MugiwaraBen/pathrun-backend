@@ -1,8 +1,8 @@
 {
-  "name": "noor-server",
+  "name": "Run-server",
   "version": "1.0.0",
   "private": true,
-  "description": "Serveur multijoueur leger pour Noor (relais WebSocket)",
+  "description": "Serveur multijoueur leger pour TheRun (relais WebSocket)",
   "scripts": { "start": "node server.js" },
   "engines": { "node": ">=18" }
 }
